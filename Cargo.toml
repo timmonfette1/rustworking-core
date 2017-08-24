@@ -1,0 +1,10 @@
+[package]
+name = "rustworking-core"
+version = "0.1.0"
+authors = ["timmonfette1 <monfette.timothy@gmail.com>"]
+repository = "https://github.com/timmonfette1/rustworking-core"
+license = "MIT"
+description = "Various network functions wrapped into/implemented in Rust functions"
+
+[dependencies]
+oping = { path = "rust-oping" }

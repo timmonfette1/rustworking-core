@@ -1,0 +1,3 @@
+[submodule "rust-oping"]
+	path = rust-oping
+	url = https://github.com/timmonfette1/rust-oping
