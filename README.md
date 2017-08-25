@@ -16,6 +16,12 @@ The following are the current operations this crate supports:
 
   - PING
 
+In the future, you'll be able to do the following operations:
+
+  - Test a TCP packet
+  - Test a UDP packet
+  - Test an HTTP request
+
 You can perform these operations on the following:
 
   - A single IP Address (v4 or v6)
