@@ -23,9 +23,57 @@ pub fn ping_ip(verbose: bool, ip: &str) -> PingResult<(String)> {
 }
 
 // PING an entire subnet of IP Addresses
+// Currently limited to Class C subnets ONLY
+//      This means your mask bits can be 24 - 30
 pub fn ping_subnet(verbose: bool, subnet: &str) {
+    let vec: Vec<&str> = subnet.split('/').collect();
+    let mask = vec[1];
+    let address = vec[0];
+    let temp: Vec<&str> = address.split('.').collect();
+
+    let mut octets = Vec::new();
+    for s in temp {
+        octets.push(s.to_owned());
+    }
+
+    let last_octet = octets[3].parse::<i32>().expect("Couldn't get last octet of IP Address");
+
+    let num_host: i32;
+    match mask {
+        "24" => num_host = 254,
+        "25" => num_host = 126,
+        "26" => num_host = 62,
+        "27" => num_host = 30,
+        "28" => num_host = 14,
+        "29" => num_host = 6,
+        "30" => num_host = 2,
+        _  =>
+        {
+            let mut stderr = ::std::io::stderr();
+            writeln!(&mut stderr, "rustworking: invalid Class C mask bits {}",
+                     mask).expect("Could not write to stderr");
+            exit(1);
+        }
+    }
+ 
+    let mut counter = num_host + 1;
+    
+    while last_octet > counter {
+        counter = counter + num_host + 2;
+    }
+
+    octets[3] = (counter - num_host - 1).to_string();
+    
     if verbose {
-        println!("Here is where I'd be verbose");
+        let mut broadcast = octets.clone();
+        broadcast[3] = (broadcast[3].parse::<i32>()
+            .expect("Error getting broadcast address") + num_host + 1)
+            .to_string();
+        println!("Address provided: {}", address);
+        println!("Mask bits provided: {}", mask);
+        println!("Subnet ID is: {}", octets.join("."));
+        println!("Broadcast Address: {}", broadcast.join("."));
+        println!("Total number of hosts in subnet: {}", num_host);
     }
     
     println!("Here is where I'd ping subnet {}", subnet);
