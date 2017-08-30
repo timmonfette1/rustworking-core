@@ -25,17 +25,11 @@ pub fn ping_ip(verbose: bool, ip: &str) -> PingResult<(String)> {
 // PING an entire subnet of IP Addresses
 // Currently limited to Class C subnets ONLY
 //      This means your mask bits can be 24 - 30
-pub fn ping_subnet(verbose: bool, subnet: &str) {
+pub fn ping_subnet(verbose: bool, subnet: &str) -> Vec<PingResult<(String)>> {
     let vec: Vec<&str> = subnet.split('/').collect();
     let mask = vec[1];
     let address = vec[0];
-    let temp: Vec<&str> = address.split('.').collect();
-
-    let mut octets = Vec::new();
-    for s in temp {
-        octets.push(s.to_owned());
-    }
-
+    let mut octets: Vec<String> = address.split('.').map(String::from).collect();
     let last_octet = octets[3].parse::<i32>().expect("Couldn't get last octet of IP Address");
 
     let num_host: i32;
@@ -57,13 +51,13 @@ pub fn ping_subnet(verbose: bool, subnet: &str) {
     }
  
     let mut counter = num_host + 1;
-    
     while last_octet > counter {
         counter = counter + num_host + 2;
     }
 
+    // octets now contains the subnet ID
     octets[3] = (counter - num_host - 1).to_string();
-    
+
     if verbose {
         let mut broadcast = octets.clone();
         broadcast[3] = (broadcast[3].parse::<i32>()
@@ -74,9 +68,37 @@ pub fn ping_subnet(verbose: bool, subnet: &str) {
         println!("Subnet ID is: {}", octets.join("."));
         println!("Broadcast Address: {}", broadcast.join("."));
         println!("Total number of hosts in subnet: {}", num_host);
+        println!("Beginning to ping subnet {}...", subnet);
     }
     
-    println!("Here is where I'd ping subnet {}", subnet);
+    // Update last octet to be the first usable address
+    octets[3] = (octets[3].parse::<i32>()
+                 .expect("Couldn't get last octet of IP Address") + 1)
+                 .to_string();
+
+    let mut results = Vec::new();
+    for _ in 1..num_host + 1 {
+        let addr = &octets.join(".");
+        if verbose {
+            println!("Sending PING for address {}", addr);
+        }
+
+        results.push(send_ping(verbose, addr));
+
+        if verbose {
+            println!("PING for address {} completed", addr);
+        }
+
+        octets[3] = (octets[3].parse::<i32>()
+                     .expect("Couldn't get last octet of IP Address") + 1)
+                     .to_string();
+    }
+
+    if verbose {
+        println!("Returning all PING responses to caller...");
+    }
+
+    results
 }
 
 // PING every IP Address in a file
