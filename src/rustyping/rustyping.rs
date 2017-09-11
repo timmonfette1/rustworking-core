@@ -131,14 +131,15 @@ pub fn ping_file(verbose: bool, filepath: &str) -> Vec<PingResult<(String)>> {
 
     for line in buff.lines() {
         let data = &line.unwrap();
+        let vec: Vec<&str> = data.split(':').collect();
         if verbose {
-            println!("Sending PING for address {}", data);
+            println!("Sending PING for address {}", vec[0]);
         }
 
-        results.push(send_ping(verbose, data));
+        results.push(send_ping(verbose, vec[0]));
 
         if verbose {
-            println!("PING for address {} completed", data);
+            println!("PING for address {} completed", vec[0]);
         }
     }
 
