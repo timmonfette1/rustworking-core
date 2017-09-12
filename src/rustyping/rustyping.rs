@@ -48,15 +48,8 @@ fn read_file(verbose: bool, filepath: String, tx: mpsc::Sender<String>) {
     }
 }
 
-// PING a single IP Address
-pub fn ping_ip(verbose: bool, ip: &str) -> PingResult<(String)> {
-    send_ping(verbose, ip)
-}
-
-// PING an entire subnet of IP Addresses
-// Currently limited to Class C subnets ONLY
-//      This means your mask bits can be 24 - 30
-pub fn ping_subnet(verbose: bool, subnet: &str) -> Vec<PingResult<(String)>> {
+// Process a subnet
+fn process_subnet(verbose: bool, subnet: String, tx: mpsc::Sender<String>) {
     let vec: Vec<&str> = subnet.split('/').collect();
     let mask = vec[1];
     let address = vec[0];
@@ -66,25 +59,25 @@ pub fn ping_subnet(verbose: bool, subnet: &str) -> Vec<PingResult<(String)>> {
     let num_host: i32;
     match mask {
         "24" => num_host = 254,
-        "25" => num_host = 126,
-        "26" => num_host = 62,
-        "27" => num_host = 30,
-        "28" => num_host = 14,
-        "29" => num_host = 6,
-        "30" => num_host = 2,
-        _  =>
-        {
-            let mut stderr = ::std::io::stderr();
-            writeln!(&mut stderr, "rustworking: invalid Class C mask bits {}",
-                     mask).expect("Could not write to stderr");
-            exit(1);
-        }
+            "25" => num_host = 126,
+            "26" => num_host = 62,
+            "27" => num_host = 30,
+            "28" => num_host = 14,
+            "29" => num_host = 6,
+            "30" => num_host = 2,
+            _    =>
+            {
+                let mut stderr = ::std::io::stderr();
+                writeln!(&mut stderr, "rustworking: invalid Class C mask bits {}",
+                         mask).expect("Could not write to stderr");
+                exit(1);
+            }
     }
- 
+
     let mut counter = num_host + 1;
     while last_octet > counter {
         counter = counter + num_host + 2;
-    }
+    }       
 
     // octets now contains the subnet ID
     octets[3] = (counter - num_host - 1).to_string();
@@ -101,28 +94,49 @@ pub fn ping_subnet(verbose: bool, subnet: &str) -> Vec<PingResult<(String)>> {
         println!("Total number of hosts in subnet: {}", num_host);
         println!("Beginning to ping subnet {}...", subnet);
     }
-    
+
     // Update last octet to be the first usable address
     octets[3] = (octets[3].parse::<i32>()
-                 .expect("Couldn't get last octet of IP Address") + 1)
-                 .to_string();
+        .expect("Couldn't get last octet of IP Address") + 1)
+        .to_string();
 
-    let mut results = Vec::new();
     for _ in 1..num_host + 1 {
-        let addr = &octets.join(".");
-        if verbose {
-            println!("Sending PING for address {}", addr);
-        }
-
-        results.push(send_ping(verbose, addr));
-
-        if verbose {
-            println!("PING for address {} completed", addr);
-        }
+        let addr = octets.join(".");
+        tx.send(addr).unwrap();
 
         octets[3] = (octets[3].parse::<i32>()
-                     .expect("Couldn't get last octet of IP Address") + 1)
-                     .to_string();
+            .expect("Couldn't get last octet of IP Address") + 1)
+            .to_string();
+    }
+}
+
+// PING a single IP Address
+pub fn ping_ip(verbose: bool, ip: &str) -> PingResult<(String)> {
+    send_ping(verbose, ip)
+}
+
+// PING an entire subnet of IP Addresses
+// Currently limited to Class C subnets ONLY
+//      This means your mask bits can be 24 - 30
+pub fn ping_subnet(verbose: bool, subnet: &str) -> Vec<PingResult<(String)>> {
+    let mut results = Vec::new();
+    let (tx, rx) = mpsc::channel();
+
+    let subc = subnet.clone().to_owned();
+    thread::spawn(move || {
+        process_subnet(verbose, subc, tx);
+    });
+
+    for rec in rx {
+        if verbose {
+            println!("Sending PING for address {}", rec);
+        }
+
+        results.push(send_ping(verbose, &rec));
+
+        if verbose {
+            println!("PING for address {} completed", rec);
+        }
     }
 
     if verbose {
