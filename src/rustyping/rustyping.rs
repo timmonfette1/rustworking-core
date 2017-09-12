@@ -12,10 +12,41 @@
 
 use oping::{Ping, PingResult, PingError};
 
+use std::thread;
+use std::sync::mpsc;
 use std::process::exit;
 use std::io::prelude::*;
 use std::io::{BufReader,BufRead};
 use std::fs::File;
+
+// Read a file
+fn read_file(verbose: bool, filepath: String, tx: mpsc::Sender<String>) {
+    if verbose {
+        println!("Opening file {}", filepath);
+    }
+
+    let f = match File::open(&filepath) {
+        Ok(file)    => file,
+        Err(e)      =>
+        {
+            let mut stderr = ::std::io::stderr();
+             writeln!(&mut stderr, "rustworking: unable to open file {}\nError recieved: {}",
+                 filepath, e).expect("Could not write to stderr");
+            exit(1);
+        },
+    };
+
+    if verbose {
+        println!("{} successfully opened", filepath);
+    }
+
+    let buff = BufReader::new(&f);
+
+    for line in buff.lines() {
+        let data = line.unwrap();
+        tx.send(data).unwrap();
+    }
+}
 
 // PING a single IP Address
 pub fn ping_ip(verbose: bool, ip: &str) -> PingResult<(String)> {
@@ -103,35 +134,20 @@ pub fn ping_subnet(verbose: bool, subnet: &str) -> Vec<PingResult<(String)>> {
 
 // PING every IP Address in a file
 pub fn ping_file(verbose: bool, filepath: &str) -> Vec<PingResult<(String)>> {
-    if verbose {
-        println!("Opening file {}", filepath);
-    }
-
-    let f = match File::open(filepath) {
-        Ok(file)    => file,
-        Err(e)      =>
-        {
-            let mut stderr = ::std::io::stderr();
-            writeln!(&mut stderr, "rustworking: unable to open file {}\nError recieved: {}",
-                     filepath, e).expect("Could not write to stderr");
-            exit(1);
-        },
-    };
-
-    if verbose {
-        println!("{} successfully opened", filepath);
-    }
-
-    let buff = BufReader::new(&f);
     let mut results = Vec::new();
-    
+    let (tx, rx) = mpsc::channel();
+
+    let fpc = filepath.clone().to_owned();
+    thread::spawn(move || {
+        read_file(verbose, fpc, tx);
+    });
+
     if verbose {
         println!("Beginning to PING each address...");
     } 
 
-    for line in buff.lines() {
-        let data = &line.unwrap();
-        let vec: Vec<&str> = data.split(':').collect();
+    for rec in rx { 
+        let vec: Vec<&str> = rec.split(':').collect();
         if verbose {
             println!("Sending PING for address {}", vec[0]);
         }
