@@ -1,3 +1,4 @@
 extern crate oping;
 
-pub mod rustyping;
+pub mod rustytools;
+pub mod utilities;
