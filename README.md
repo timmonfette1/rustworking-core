@@ -15,12 +15,12 @@ Supported Functions
 The following are the current operations this crate supports:
 
   - PING
+  - Test an HTTP request (limited to single IP address right now)
 
 In the future, you'll be able to do the following operations:
 
   - Test a TCP packet
   - Test a UDP packet
-  - Test an HTTP request
 
 You can perform these operations on the following:
 
