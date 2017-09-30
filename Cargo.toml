@@ -7,4 +7,5 @@ license = "MIT"
 description = "Various network functions wrapped into/implemented in Rust functions"
 
 [dependencies]
+reqwest = "0.7"
 oping = { path = "rust-oping" }
