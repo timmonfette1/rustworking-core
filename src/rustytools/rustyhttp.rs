@@ -11,7 +11,7 @@
  */
 
 use super::super::{HttpError, HttpResult};
-use utilities::helpers::{read_file};
+use utilities::helpers::{read_file, process_subnet};
 use reqwest;
 
 use std::thread;
@@ -22,6 +22,38 @@ pub fn http_ip(verbose: bool, ip: &str) -> HttpResult<(String)> {
     send_http(verbose, ip)
 }
 
+// Send HTTP request to  an entire subnet of IP Addresses
+// Currently limited to Class C subnets ONLY
+//      This means your mask bits can be 24 - 30
+pub fn http_subnet(verbose: bool, subnet: &str) -> Vec<HttpResult<(String)>> {
+    let mut results = Vec::new();
+    let (tx, rx) = mpsc::channel();
+
+    let subc = subnet.clone().to_owned();
+    thread::spawn(move || {
+        process_subnet(verbose, subc, tx);
+    });
+
+    for rec in rx {
+        if verbose {
+            println!("Sending HTTP request for address {}", rec);
+        }
+
+        results.push(send_http(verbose, &rec));
+
+        if verbose {
+            println!("HTTP request for address {} completed", rec);
+        }
+    }
+
+    if verbose {
+        println!("Returning all HTTP responses to caller...");
+    }
+
+    results
+}
+
+// Send HTTP request to every address in a file
 pub fn http_file(verbose: bool, filepath: &str) -> Vec<HttpResult<(String)>> {
     let mut results = Vec::new();
     let (tx, rx) = mpsc::channel();
