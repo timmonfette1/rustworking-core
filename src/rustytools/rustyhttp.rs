@@ -4,18 +4,55 @@
  * system administration.
  *
  * Set of functions to hanlde testing IP Addresses
- * using PING.
+ * using HTTP.
  *
  * Author: Tim Monfette
  * Version: 0.1.0
  */
 
 use super::super::{HttpError, HttpResult};
+use utilities::helpers::{read_file};
 use reqwest;
+
+use std::thread;
+use std::sync::mpsc;
 
 // Send HTTP request to single IP Address
 pub fn http_ip(verbose: bool, ip: &str) -> HttpResult<(String)> {
     send_http(verbose, ip)
+}
+
+pub fn http_file(verbose: bool, filepath: &str) -> Vec<HttpResult<(String)>> {
+    let mut results = Vec::new();
+    let (tx, rx) = mpsc::channel();
+
+    let fpc = filepath.clone().to_owned();
+    thread::spawn(move || {
+        read_file(verbose, fpc, tx);
+    });
+
+    if verbose {
+        println!("Beginning to test HTTP on each address...");
+    }
+
+    for rec in rx {
+        let vec: Vec<&str> = rec.split(':').collect();
+        if verbose {
+            println!("Sending HTTP request for address {}", vec[0]);
+        }
+
+        results.push(send_http(verbose, vec[0]));
+
+        if verbose {
+            println!("HTTP request for address {} completed", vec[0]);
+        }
+    }
+
+    if verbose {
+        println!("Returning all HTTP responses to caller...");
+    }
+
+    results
 }
 
 // Process an HTTP request on an IP Address
